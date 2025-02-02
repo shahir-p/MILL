@@ -1,0 +1,12 @@
+# Ignore sensitive files
+service-account.json
+smsSender.js
+package-lock.json
+package.json
+# Ignore node_modules (for Node.js projects)
+node_modules/
+
+
+
+
+.json

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Details</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js" type="module"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <div id="customAlert" style="
+    display: none; 
+    position: fixed; 
+    top: 20px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background-color: #007bff; 
+    color: white; 
+    padding: 10px 20px; 
+    border-radius: 5px; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    font-size: 14px; 
+    z-index: 100000000;">
+        </div>
+        <div class="d-flex justify-content-between">
+            <h1>Name: <span id="customerName"></span></h1>
+            <div>
+
+                <button class="bg-danger text-white" style="width: 200px; font-size: 30px;"
+                    id="dltButton">Delete</button>
+                <button class="bg-success text-white" style="width: 200px; font-size: 30px;" id="payButton">Pay</button>
+                <button class="bg-white text-dark" style="width: 50px; font-size: 30px;border: none;" id="Download"><img src="./icons/download.png" alt="" style="width: 100%;"></button>
+            </div>
+        </div>
+        <h4 class="mt-2">Phone Number : <span id="phoneNumber">Loading...</span></h4>
+        <h5 class="mt-">Date of purchase : <span id="date">Loading...</span></h5>
+        
+        <h5 class="mt-3">Total Amount : <span id="totalAmount">Loading...</span></h5>
+        <h5 class="mt-3">Paid Amount : <span id="initialPayment">Loading...</span></h5>
+        <h5 class="mt-3">Balance Amount : <span id="balanceAmount">Loading...</span></h5>
+
+        <h5 class="mt-3">Transaction Type: <span id="TransactionType">Loading...</span></h5>
+
+        <div class="d-flex justify-content-around mt-3">
+            <div style="width: 50%;" class="border  rounded border-3 p-2 border-dark mt-2">
+                <h5 class="">Product Items :</h5>
+                <table class="table table-bordered border   mt-4">
+                    <thead>
+                        <tr>
+                            <th>S/I</th>
+                            <th>Product</th>
+                            <th>Unit Price</th>
+                            <th>Quantity</th>
+                            <th>amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody">
+                        <!-- Products will be added here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="width: 45%;" id="history" class="border border-3 border-dark mt-2 p-2 rounded">
+                <h5 class="">Payment History :</h5>
+                <table class="table table-bordered border  mt-4">
+                    <thead>
+                        <tr>
+                            <th>S/I</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Paid Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentHistoryTableBody">
+
+                        <!-- Payment history will be added here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- delete model -->
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete this customer? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteButton">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Pay Modal -->
+    <div class="modal" tabindex="-1" id="payModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enter Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Balance Amount: <span id="modalBalanceAmount">0</span></h6>
+                    <input type="number" id="paymentAmount" class="form-control" placeholder="Enter payment amount">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="confirmPayment">Update</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, updateDoc, doc, arrayUnion, deleteDoc  } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZ_mkqt1dB2_uLRGamOxxjcOjgxntL8gY",
+            authDomain: "mill-karathur-6756d.firebaseapp.com",
+            projectId: "mill-karathur-6756d",
+            storageBucket: "mill-karathur-6756d.appspot.com",
+            messagingSenderId: "304225841532",
+            appId: "1:304225841532:web:c09b203608227e991bb4f9",
+            measurementId: "G-VRXZKDPYPX",
+        };
+
+        // Initialize Firebase and Firestore
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Get the customer name from the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const customerName = urlParams.get('customerName');
+
+        document.getElementById("customerName").textContent = customerName;
+
+        let customerDocId = null;
+        let currentBalance = 0;
+
+        async function fetchCustomerDetails() {
+            try {
+                const customerRef = collection(db, "bills");
+                const nameQuery = query(customerRef, where("customerName", "==", customerName));
+                const querySnapshot = await getDocs(nameQuery);
+
+                if (!querySnapshot.empty) {
+                    const customerDoc = querySnapshot.docs[0];
+                    customerDocId = customerDoc.id;
+                    const customerData = customerDoc.data();
+
+                    // Log the full customer data and transaction history for inspection
+                    console.log("Customer Data:", customerData);
+                    console.log("Transaction History:", customerData.transactionHistory);
+
+                    const initialPayment = customerData.initialPayment || 0;
+                    const totalAmount = customerData.totalAmount || 0;
+                    currentBalance = customerData.balanceAmount || totalAmount - initialPayment;
+                    const numberPhone = customerData.phoneNumber;
+                    const Date=customerData.date;
+                    const transaction = customerData.transactionType;
+
+                    document.getElementById("initialPayment").textContent = initialPayment;
+                    document.getElementById("totalAmount").textContent = totalAmount;
+                    document.getElementById("balanceAmount").textContent = currentBalance;
+                    document.getElementById("phoneNumber").textContent = numberPhone;
+                    document.getElementById("TransactionType").textContent = transaction;
+                    document.getElementById("date").textContent = Date;
+
+                    // Show/Hide the Pay/Delete buttons based on balance amount
+                    togglePaymentButtons(currentBalance);
+
+                    displayProducts(customerData.items || []);
+
+                    // Check if transactionHistory exists and display
+                    if (customerData.transactionHistory && customerData.transactionHistory.length > 0) {
+                        displayPaymentHistory(customerData.transactionHistory);
+                    } else {
+                        console.log("No transaction history available.");
+                        document.getElementById("paymentHistoryTableBody").innerHTML = "<tr><td colspan='4'>No payment history found</td></tr>";
+                    }
+
+                } else {
+                    console.error("Customer not found");
+                }
+            } catch (error) {
+                console.error("Error fetching customer data: ", error);
+            }
+        }
+
+        // Function to show/hide the Pay/Delete buttons
+        function togglePaymentButtons(balance) {
+            const dltButton = document.getElementById("dltButton");
+            const payButton = document.getElementById("payButton");
+
+            // Show delete button only if balance is zero
+            if (balance === 0) {
+                dltButton.style.display = "inline-block";  // Show delete button
+                payButton.style.display = "none";          // Hide pay button
+            } else {
+                payButton.style.display = "inline-block";  // Show pay button
+                dltButton.style.display = "none";          // Hide delete button
+            }
+        }
+
+        function displayPaymentHistory(transactionHistory) {
+            const paymentHistoryTableBody = document.getElementById("paymentHistoryTableBody");
+            paymentHistoryTableBody.innerHTML = "";
+
+            if (transactionHistory.length === 0) {
+                paymentHistoryTableBody.innerHTML = "<tr><td colspan='5'>No payment history found</td></tr>";
+                return;
+            }
+
+            let totalAmount = currentBalance; // Initialize totalAmount from the current balance or the customer data
+
+            transactionHistory.forEach((transaction, index) => {
+                const row = document.createElement("tr");
+
+                // Parse the string timestamp into a Date object
+                const timestampString = transaction.timestamp;
+                const timestamp = new Date(timestampString);
+
+                // Format the date and time
+                const date = timestamp.toLocaleDateString("en-GB");
+                const time = timestamp.toLocaleTimeString();
+
+                // Calculate the balance after this transaction
+
+
+                row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${date}</td>
+            <td>${time}</td>
+            <td>${transaction.paidAmount}</td>`
+           
+        ;
+
+                // Add the row to the table
+                paymentHistoryTableBody.appendChild(row);
+
+                // Update the totalAmount for the next iteration (running balance)
+                totalAmount -= transaction.paidAmount;
+            });
+        }
+
+
+        function displayProducts(items) {
+            const productTableBody = document.getElementById("productTableBody");
+            productTableBody.innerHTML = "";
+
+            if (items.length === 0) {
+                productTableBody.innerHTML = "<tr><td colspan='4'>No products found</td></tr>";
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.itemName}</td>
+                    <td>${item.unitPrice}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.amount}</td>`
+                ;
+                productTableBody.appendChild(row);
+            });
+        }
+
+        document.getElementById("payButton").addEventListener("click", () => {
+            document.getElementById("modalBalanceAmount").textContent = currentBalance;
+            document.getElementById("paymentAmount").setAttribute("max", currentBalance);
+            document.getElementById("paymentAmount").value = ""; // Clear the input field
+
+            const modal = new bootstrap.Modal(document.getElementById("payModal"));
+            modal.show();
+        });
+
+        document.getElementById("confirmPayment").addEventListener("click", async () => {
+            const paymentAmount = parseFloat(document.getElementById("paymentAmount").value);
+
+            if (isNaN(paymentAmount) || paymentAmount <= 0 || paymentAmount > currentBalance) {
+                showAlert("Please enter a valid amount up to the balance amount.", 2500);
+                        
+             
+                return;
+            }
+
+            try {
+                const customerRef = doc(db, "bills", customerDocId);
+                const currentPaid = parseFloat(document.getElementById("initialPayment").textContent);
+
+                const newPaid = currentPaid + paymentAmount;
+                const newBalance = currentBalance - paymentAmount;
+
+                // Prepare the new transaction entry
+                const transactionEntry = {
+                    paidAmount: paymentAmount,
+                    timestamp: new Date().toISOString(), // Add current timestamp
+                };
+
+                // Update Firestore document: add to transactionHistory, update initialPayment and balanceAmount
+                await updateDoc(customerRef, {
+                    initialPayment: newPaid,
+                    balanceAmount: newBalance,
+                    transactionHistory: arrayUnion(transactionEntry), // Use arrayUnion from Firestore
+                });
+
+                console.log("Payment updated successfully!");
+                location.reload();
+            } catch (error) {
+                console.error("Error updating payment: ", error);
+                alert("Error updating payment, contact Code114. @ 9526718126");
+            }
+        });
+
+        document.getElementById("dltButton").addEventListener("click", () => {
+            // Show the confirmation modal
+            const modal = new bootstrap.Modal(document.getElementById("confirmDeleteModal"));
+            modal.show();
+        });
+
+        document.getElementById("confirmDeleteButton").addEventListener("click", async () => {
+            try {
+                // Get the customer reference from Firestore using the customerDocId
+                const customerRef = doc(db, "bills", customerDocId);
+
+                // Delete the customer document from Firestore
+                await deleteDoc(customerRef);
+
+                console.log("Customer deleted successfully!");
+
+                // Redirect to a different page or update the UI accordingly
+                window.location.href = 'customers.html';// Redirect to the customers list page
+            } catch (error) {
+                console.error("Error deleting customer: ", error);
+                alert("Error deleting customer, contact Code114. @ 9526718126");
+            }
+        });
+
+        const showAlert = (message, duration = 3000) => {
+                const alertBox = document.getElementById("customAlert");
+                alertBox.textContent = message;
+                alertBox.style.display = "block";
+
+                // Hide the alert after the specified duration
+                setTimeout(() => {
+                    alertBox.style.display = "none";
+                }, duration);
+            };
+
+
+        fetchCustomerDetails();
+    </script>
+
+</body>
+
+</html>
